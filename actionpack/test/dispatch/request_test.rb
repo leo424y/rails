@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "abstract_unit"
 
 class BaseRequestTest < ActiveSupport::TestCase
@@ -761,7 +763,7 @@ class RequestMethod < BaseRequestTest
 
   test "post uneffected by local inflections" do
     existing_acronyms = ActiveSupport::Inflector.inflections.acronyms.dup
-    existing_acronym_regex = ActiveSupport::Inflector.inflections.acronym_regex.dup
+    assert_deprecated { ActiveSupport::Inflector.inflections.acronym_regex.dup }
     begin
       ActiveSupport::Inflector.inflections do |inflect|
         inflect.acronym "POS"
@@ -775,7 +777,7 @@ class RequestMethod < BaseRequestTest
       # Reset original acronym set
       ActiveSupport::Inflector.inflections do |inflect|
         inflect.send(:instance_variable_set, "@acronyms", existing_acronyms)
-        inflect.send(:instance_variable_set, "@acronym_regex", existing_acronym_regex)
+        inflect.send(:define_acronym_regex_patterns)
       end
     end
   end
@@ -1024,7 +1026,8 @@ class RequestParameters < BaseRequestTest
       request.path_parameters = { foo: "\xBE" }
     end
 
-    assert_equal "Invalid path parameters: Non UTF-8 value: \xBE", err.message
+    assert_predicate err.message, :valid_encoding?
+    assert_equal "Invalid path parameters: Invalid encoding for parameter: �", err.message
   end
 
   test "parameters not accessible after rack parse error of invalid UTF8 character" do
@@ -1299,5 +1302,20 @@ class RequestFormData < BaseRequestTest
     assert_equal "", request.media_type
     assert_equal "POST", request.request_method
     assert !request.form_data?
+  end
+end
+
+class EarlyHintsRequestTest < BaseRequestTest
+  def setup
+    super
+    @env["rack.early_hints"] = lambda { |links| links }
+    @request = stub_request
+  end
+
+  test "when early hints is set in the env link headers are sent" do
+    early_hints = @request.send_early_hints("Link" => "</style.css>; rel=preload; as=style\n</script.js>; rel=preload")
+    expected_hints = { "Link" => "</style.css>; rel=preload; as=style\n</script.js>; rel=preload" }
+
+    assert_equal expected_hints, early_hints
   end
 end

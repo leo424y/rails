@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "securerandom"
 require "abstract_unit"
 require "active_support/core_ext/string/inflections"
@@ -98,11 +100,11 @@ class TestJSONEncoding < ActiveSupport::TestCase
   end
 
   def test_hash_should_allow_key_filtering_with_only
-    assert_equal %({"a":1}), ActiveSupport::JSON.encode({ "a" => 1, :b => 2, :c => 3 }, only: "a")
+    assert_equal %({"a":1}), ActiveSupport::JSON.encode({ "a" => 1, :b => 2, :c => 3 }, { only: "a" })
   end
 
   def test_hash_should_allow_key_filtering_with_except
-    assert_equal %({"b":2}), ActiveSupport::JSON.encode({ "foo" => "bar", :b => 2, :c => 3 }, except: ["foo", :c])
+    assert_equal %({"b":2}), ActiveSupport::JSON.encode({ "foo" => "bar", :b => 2, :c => 3 }, { except: ["foo", :c] })
   end
 
   def test_time_to_json_includes_local_offset
@@ -208,7 +210,7 @@ class TestJSONEncoding < ActiveSupport::TestCase
 
   People = Class.new(BasicObject) do
     include Enumerable
-    def initialize()
+    def initialize
       @people = [
         { name: "John", address: { city: "London", country: "UK" } },
         { name: "Jean", address: { city: "Paris" , country: "France" } }
@@ -450,6 +452,10 @@ EXPECTED
 
   def test_to_json_works_when_as_json_returns_NaN_number
     assert_equal '{"number":null}', NaNNumber.new.to_json
+  end
+
+  def test_to_json_works_on_io_objects
+    assert_equal STDOUT.to_s.to_json, STDOUT.to_json
   end
 
   private

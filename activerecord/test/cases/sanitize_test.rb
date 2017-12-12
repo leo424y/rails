@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "models/binary"
 require "models/author"
@@ -149,18 +151,6 @@ class SanitizeTest < ActiveRecord::TestCase
     assert_equal "name=#{quoted_bambi_and_thumper}", bind("name=?", "Bambi\nand\nThumper")
     assert_equal "name=#{quoted_bambi}", bind("name=?", "Bambi".mb_chars)
     assert_equal "name=#{quoted_bambi_and_thumper}", bind("name=?", "Bambi\nand\nThumper".mb_chars)
-  end
-
-  def test_bind_record
-    o = Class.new {
-      def quoted_id
-        1
-      end
-    }.new
-    assert_deprecated { assert_equal "1", bind("?", o) }
-
-    os = [o] * 3
-    assert_deprecated { assert_equal "1,1,1", bind("?", os) }
   end
 
   def test_named_bind_with_postgresql_type_casts

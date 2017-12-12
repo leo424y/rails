@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "active_model/type/helpers"
 require "active_model/type/value"
 
@@ -29,6 +31,10 @@ module ActiveModel
 
       def lookup(*args, **kwargs) # :nodoc:
         registry.lookup(*args, **kwargs)
+      end
+
+      def default_value # :nodoc:
+        @default_value ||= Value.new
       end
     end
 

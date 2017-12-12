@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #--
 # Copyright (c) 2004-2017 David Heinemeier Hansson
 #
@@ -40,6 +42,7 @@ module ActionDispatch
 
   eager_autoload do
     autoload_under "http" do
+      autoload :ContentSecurityPolicy
       autoload :Request
       autoload :Response
     end

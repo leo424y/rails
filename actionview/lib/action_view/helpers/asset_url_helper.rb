@@ -1,8 +1,10 @@
+# frozen_string_literal: true
+
 require "zlib"
 
 module ActionView
   # = Action View Asset URL Helpers
-  module Helpers
+  module Helpers #:nodoc:
     # This module provides methods for generating asset paths and
     # urls.
     #
@@ -27,7 +29,7 @@ module ActionView
     # Helpers take that into account:
     #
     #   image_tag("rails.png")
-    #   # => <img alt="Rails" src="http://assets.example.com/assets/rails.png" />
+    #   # => <img src="http://assets.example.com/assets/rails.png" />
     #   stylesheet_link_tag("application")
     #   # => <link href="http://assets.example.com/assets/application.css" media="screen" rel="stylesheet" />
     #
@@ -40,7 +42,7 @@ module ActionView
     # "assets0.example.com", ..., "assets3.example.com".
     #
     #   image_tag("rails.png")
-    #   # => <img alt="Rails" src="http://assets0.example.com/assets/rails.png" />
+    #   # => <img src="http://assets0.example.com/assets/rails.png" />
     #   stylesheet_link_tag("application")
     #   # => <link href="http://assets2.example.com/assets/application.css" media="screen" rel="stylesheet" />
     #
@@ -66,7 +68,7 @@ module ActionView
     #     "http://assets#{Digest::MD5.hexdigest(source).to_i(16) % 2 + 1}.example.com"
     #   }
     #   image_tag("rails.png")
-    #   # => <img alt="Rails" src="http://assets1.example.com/assets/rails.png" />
+    #   # => <img src="http://assets1.example.com/assets/rails.png" />
     #   stylesheet_link_tag("application")
     #   # => <link href="http://assets2.example.com/assets/application.css" media="screen" rel="stylesheet" />
     #
@@ -85,7 +87,7 @@ module ActionView
     #      end
     #    }
     #   image_tag("rails.png")
-    #   # => <img alt="Rails" src="http://assets.example.com/assets/rails.png" />
+    #   # => <img src="http://assets.example.com/assets/rails.png" />
     #   stylesheet_link_tag("application")
     #   # => <link href="http://stylesheets.example.com/assets/application.css" media="screen" rel="stylesheet" />
     #
@@ -322,7 +324,7 @@ module ActionView
       # Since +javascript_url+ is based on +asset_url+ method you can set :host options. If :host
       # options is set, it overwrites global +config.action_controller.asset_host+ setting.
       #
-      #   javascript_url "js/xmlhr.js", host: "http://stage.example.com" # => http://stage.example.com/assets/dir/xmlhr.js
+      #   javascript_url "js/xmlhr.js", host: "http://stage.example.com" # => http://stage.example.com/assets/js/xmlhr.js
       #
       def javascript_url(source, options = {})
         url_to_asset(source, { type: :javascript }.merge!(options))
@@ -349,7 +351,7 @@ module ActionView
       # Since +stylesheet_url+ is based on +asset_url+ method you can set :host options. If :host
       # options is set, it overwrites global +config.action_controller.asset_host+ setting.
       #
-      #   stylesheet_url "css/style.css", host: "http://stage.example.com" # => http://stage.example.com/css/style.css
+      #   stylesheet_url "css/style.css", host: "http://stage.example.com" # => http://stage.example.com/assets/css/style.css
       #
       def stylesheet_url(source, options = {})
         url_to_asset(source, { type: :stylesheet }.merge!(options))
@@ -379,7 +381,7 @@ module ActionView
       # Since +image_url+ is based on +asset_url+ method you can set :host options. If :host
       # options is set, it overwrites global +config.action_controller.asset_host+ setting.
       #
-      #   image_url "edit.png", host: "http://stage.example.com" # => http://stage.example.com/edit.png
+      #   image_url "edit.png", host: "http://stage.example.com" # => http://stage.example.com/assets/edit.png
       #
       def image_url(source, options = {})
         url_to_asset(source, { type: :image }.merge!(options))
@@ -405,7 +407,7 @@ module ActionView
       # Since +video_url+ is based on +asset_url+ method you can set :host options. If :host
       # options is set, it overwrites global +config.action_controller.asset_host+ setting.
       #
-      #   video_url "hd.avi", host: "http://stage.example.com" # => http://stage.example.com/hd.avi
+      #   video_url "hd.avi", host: "http://stage.example.com" # => http://stage.example.com/videos/hd.avi
       #
       def video_url(source, options = {})
         url_to_asset(source, { type: :video }.merge!(options))
@@ -431,7 +433,7 @@ module ActionView
       # Since +audio_url+ is based on +asset_url+ method you can set :host options. If :host
       # options is set, it overwrites global +config.action_controller.asset_host+ setting.
       #
-      #   audio_url "horse.wav", host: "http://stage.example.com" # => http://stage.example.com/horse.wav
+      #   audio_url "horse.wav", host: "http://stage.example.com" # => http://stage.example.com/audios/horse.wav
       #
       def audio_url(source, options = {})
         url_to_asset(source, { type: :audio }.merge!(options))
@@ -456,7 +458,7 @@ module ActionView
       # Since +font_url+ is based on +asset_url+ method you can set :host options. If :host
       # options is set, it overwrites global +config.action_controller.asset_host+ setting.
       #
-      #   font_url "font.ttf", host: "http://stage.example.com" # => http://stage.example.com/font.ttf
+      #   font_url "font.ttf", host: "http://stage.example.com" # => http://stage.example.com/fonts/font.ttf
       #
       def font_url(source, options = {})
         url_to_asset(source, { type: :font }.merge!(options))

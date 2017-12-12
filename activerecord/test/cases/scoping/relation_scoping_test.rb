@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "models/post"
 require "models/author"
@@ -226,6 +228,29 @@ class RelationScopingTest < ActiveRecord::TestCase
       assert Comment.all.any?
       assert VerySpecialComment.all.any?
       assert SpecialComment.all.any?
+    end
+  end
+
+  def test_scoping_is_correctly_restored
+    Comment.unscoped do
+      SpecialComment.unscoped.created
+    end
+
+    assert_nil Comment.current_scope
+    assert_nil SpecialComment.current_scope
+  end
+
+  def test_scoping_respects_current_class
+    Comment.unscoped do
+      assert_equal "a comment...", Comment.all.what_are_you
+      assert_equal "a special comment...", SpecialComment.all.what_are_you
+    end
+  end
+
+  def test_scoping_respects_sti_constraint
+    Comment.unscoped do
+      assert_equal comments(:greetings), Comment.find(1)
+      assert_raises(ActiveRecord::RecordNotFound) { SpecialComment.find(1) }
     end
   end
 

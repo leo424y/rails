@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 #--
 # Copyright (c) 2004-2017 David Heinemeier Hansson
 #
@@ -25,14 +27,14 @@ require "active_support"
 require "active_support/rails"
 require "active_model"
 require "arel"
+require "yaml"
 
 require "active_record/version"
-require "active_record/attribute_set"
+require "active_model/attribute_set"
 
 module ActiveRecord
   extend ActiveSupport::Autoload
 
-  autoload :Attribute
   autoload :Base
   autoload :Callbacks
   autoload :Core
@@ -102,6 +104,7 @@ module ActiveRecord
 
     autoload :Result
     autoload :TableMetadata
+    autoload :Type
   end
 
   module Coders
@@ -179,3 +182,7 @@ end
 ActiveSupport.on_load(:i18n) do
   I18n.load_path << File.expand_path("active_record/locale/en.yml", __dir__)
 end
+
+YAML.load_tags["!ruby/object:ActiveRecord::AttributeSet"] = "ActiveModel::AttributeSet"
+YAML.load_tags["!ruby/object:ActiveRecord::Attribute::FromDatabase"] = "ActiveModel::Attribute::FromDatabase"
+YAML.load_tags["!ruby/object:ActiveRecord::LazyAttributeHash"] = "ActiveModel::LazyAttributeHash"

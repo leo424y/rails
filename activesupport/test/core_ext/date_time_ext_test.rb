@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "abstract_unit"
 require "active_support/time"
 require "core_ext/date_and_time_behavior"
@@ -26,28 +28,6 @@ class DateTimeExtCalculationsTest < ActiveSupport::TestCase
       assert_equal "2008-06-09T04:05:01-05:00", DateTime.civil(2008, 6, 9, 4, 5, 1, Rational(-18000, 86400)).to_s(:iso8601)
       assert_equal "2009-02-05T14:30:05+00:00", DateTime.civil(2009, 2, 5, 14, 30, 5).to_s(:iso8601)
     end
-  end
-
-  def test_next_occur
-    datetime = DateTime.new(2016, 9, 24, 0, 0) # saturday
-    assert_equal datetime.next_occurring(:monday), datetime.since(2.days)
-    assert_equal datetime.next_occurring(:tuesday), datetime.since(3.days)
-    assert_equal datetime.next_occurring(:wednesday), datetime.since(4.days)
-    assert_equal datetime.next_occurring(:thursday), datetime.since(5.days)
-    assert_equal datetime.next_occurring(:friday), datetime.since(6.days)
-    assert_equal datetime.next_occurring(:saturday), datetime.since(1.week)
-    assert_equal datetime.next_occurring(:sunday), datetime.since(1.day)
-  end
-
-  def test_prev_occur
-    datetime = DateTime.new(2016, 9, 24, 0, 0) # saturday
-    assert_equal datetime.prev_occurring(:monday), datetime.ago(5.days)
-    assert_equal datetime.prev_occurring(:tuesday), datetime.ago(4.days)
-    assert_equal datetime.prev_occurring(:wednesday), datetime.ago(3.days)
-    assert_equal datetime.prev_occurring(:thursday), datetime.ago(2.days)
-    assert_equal datetime.prev_occurring(:friday), datetime.ago(1.day)
-    assert_equal datetime.prev_occurring(:saturday), datetime.ago(1.week)
-    assert_equal datetime.prev_occurring(:sunday), datetime.ago(6.days)
   end
 
   def test_readable_inspect
@@ -160,10 +140,6 @@ class DateTimeExtCalculationsTest < ActiveSupport::TestCase
     assert_equal DateTime.civil(2005, 4, 30, 23, 59, Rational(59999999999, 1000000000)), DateTime.civil(2005, 4, 20, 10, 10, 10).end_of_month
   end
 
-  def test_last_year
-    assert_equal DateTime.civil(2004, 6, 5, 10),  DateTime.civil(2005, 6, 5, 10, 0, 0).last_year
-  end
-
   def test_ago
     assert_equal DateTime.civil(2005, 2, 22, 10, 10, 9),  DateTime.civil(2005, 2, 22, 10, 10, 10).ago(1)
     assert_equal DateTime.civil(2005, 2, 22, 9, 10, 10),  DateTime.civil(2005, 2, 22, 10, 10, 10).ago(3600)
@@ -244,10 +220,6 @@ class DateTimeExtCalculationsTest < ActiveSupport::TestCase
 
   def test_date_time_should_have_correct_last_week_for_leap_year
     assert_equal DateTime.civil(2016, 2, 29), DateTime.civil(2016, 3, 7).last_week
-  end
-
-  def test_last_month_on_31st
-    assert_equal DateTime.civil(2004, 2, 29), DateTime.civil(2004, 3, 31).last_month
   end
 
   def test_last_quarter_on_31st

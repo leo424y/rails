@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "models/post"
 require "models/topic"
@@ -115,7 +117,8 @@ class NamedScopingTest < ActiveRecord::TestCase
     assert_not_equal Post.containing_the_letter_a, authors(:david).posts
     assert !Post.containing_the_letter_a.empty?
 
-    assert_equal authors(:david).posts & Post.containing_the_letter_a, authors(:david).posts.containing_the_letter_a
+    expected = authors(:david).posts & Post.containing_the_letter_a
+    assert_equal expected.sort_by(&:id), authors(:david).posts.containing_the_letter_a.sort_by(&:id)
   end
 
   def test_scope_with_STI
@@ -127,7 +130,8 @@ class NamedScopingTest < ActiveRecord::TestCase
     assert_not_equal Comment.containing_the_letter_e, authors(:david).comments
     assert !Comment.containing_the_letter_e.empty?
 
-    assert_equal authors(:david).comments & Comment.containing_the_letter_e, authors(:david).comments.containing_the_letter_e
+    expected = authors(:david).comments & Comment.containing_the_letter_e
+    assert_equal expected.sort_by(&:id), authors(:david).comments.containing_the_letter_e.sort_by(&:id)
   end
 
   def test_scopes_honor_current_scopes_from_when_defined
@@ -145,6 +149,22 @@ class NamedScopingTest < ActiveRecord::TestCase
       Class.new(Post).class_eval { scope :containing_the_letter_z, where("body LIKE '%z%'") }
     end
     assert_equal "The scope body needs to be callable.", e.message
+  end
+
+  def test_scopes_name_is_relation_method
+    conflicts = [
+      :records,
+      :to_ary,
+      :to_sql,
+      :explain
+    ]
+
+    conflicts.each do |name|
+      e = assert_raises ArgumentError do
+        Class.new(Post).class_eval { scope name, -> { where(approved: true) } }
+      end
+      assert_match(/You tried to define a scope named \"#{name}\" on the model/, e.message)
+    end
   end
 
   def test_active_records_have_scope_named__all__

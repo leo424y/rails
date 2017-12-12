@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "active_support/core_ext/class/attribute"
 require "minitest"
 
@@ -71,7 +73,12 @@ module Rails
       end
 
       def app_root
-        @app_root ||= defined?(ENGINE_ROOT) ? ENGINE_ROOT : Rails.root
+        @app_root ||=
+          if defined?(ENGINE_ROOT)
+            ENGINE_ROOT
+          elsif Rails.respond_to?(:root)
+            Rails.root
+          end
       end
 
       def colored_output?

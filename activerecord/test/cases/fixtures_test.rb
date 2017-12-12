@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "models/admin"
 require "models/admin/account"
@@ -130,7 +132,7 @@ class FixturesTest < ActiveRecord::TestCase
   def test_no_args_record_returns_all_without_array
     all_binaries = binaries
     assert_kind_of(Array, all_binaries)
-    assert_equal 1, binaries.length
+    assert_equal 2, binaries.length
   end
 
   def test_nil_raises
@@ -311,6 +313,7 @@ class FixturesTest < ActiveRecord::TestCase
     data.force_encoding("ASCII-8BIT")
     data.freeze
     assert_equal data, @flowers.data
+    assert_equal data, @binary_helper.data
   end
 
   def test_serialized_fixtures
@@ -395,6 +398,7 @@ if Account.connection.respond_to?(:reset_pk_sequence!)
   class FixturesResetPkSequenceTest < ActiveRecord::TestCase
     fixtures :accounts
     fixtures :companies
+    self.use_transactional_tests = false
 
     def setup
       @instances = [Account.new(credit_limit: 50), Company.new(name: "RoR Consulting"), Course.new(name: "Test")]
@@ -839,6 +843,8 @@ class FasterFixturesTest < ActiveRecord::TestCase
 end
 
 class FoxyFixturesTest < ActiveRecord::TestCase
+  # Set to false to blow away fixtures cache and ensure our fixtures are loaded
+  self.use_transactional_tests = false
   fixtures :parrots, :parrots_pirates, :pirates, :treasures, :mateys, :ships, :computers,
            :developers, :"admin/accounts", :"admin/users", :live_parrots, :dead_parrots, :books
 

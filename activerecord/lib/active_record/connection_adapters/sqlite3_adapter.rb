@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "active_record/connection_adapters/abstract_adapter"
 require "active_record/connection_adapters/statement_pool"
 require "active_record/connection_adapters/sqlite3/explain_pretty_printer"
@@ -55,7 +57,6 @@ module ActiveRecord
       ADAPTER_NAME = "SQLite".freeze
 
       include SQLite3::Quoting
-      include SQLite3::ColumnDumper
       include SQLite3::SchemaStatements
 
       NATIVE_DATABASE_TYPES = {
@@ -69,19 +70,32 @@ module ActiveRecord
         time:         { name: "time" },
         date:         { name: "date" },
         binary:       { name: "blob" },
-        boolean:      { name: "boolean" }
+        boolean:      { name: "boolean" },
+        json:         { name: "json" },
       }
 
-      class StatementPool < ConnectionAdapters::StatementPool
-        private
+      ##
+      # :singleton-method:
+      # Indicates whether boolean values are stored in sqlite3 databases as 1
+      # and 0 or 't' and 'f'. Leaving <tt>ActiveRecord::ConnectionAdapters::SQLite3Adapter.represent_boolean_as_integer</tt>
+      # set to false is deprecated. SQLite databases have used 't' and 'f' to
+      # serialize boolean values and must have old data converted to 1 and 0
+      # (its native boolean serialization) before setting this flag to true.
+      # Conversion can be accomplished by setting up a rake task which runs
+      #
+      #   ExampleModel.where("boolean_column = 't'").update_all(boolean_column: 1)
+      #   ExampleModel.where("boolean_column = 'f'").update_all(boolean_column: 0)
+      # for all models and all boolean columns, after which the flag must be set
+      # to true by adding the following to your <tt>application.rb</tt> file:
+      #
+      #   Rails.application.config.active_record.sqlite3.represent_boolean_as_integer = true
+      class_attribute :represent_boolean_as_integer, default: false
 
+      class StatementPool < ConnectionAdapters::StatementPool # :nodoc:
+        private
           def dealloc(stmt)
             stmt[:stmt].close unless stmt[:stmt].closed?
           end
-      end
-
-      def update_table_definition(table_name, base) # :nodoc:
-        SQLite3::Table.new(table_name, base)
       end
 
       def initialize(connection, logger, connection_options, config)
@@ -118,6 +132,10 @@ module ActiveRecord
       end
 
       def supports_datetime_with_precision?
+        true
+      end
+
+      def supports_json?
         true
       end
 
@@ -169,7 +187,7 @@ module ActiveRecord
       # REFERENTIAL INTEGRITY ====================================
 
       def disable_referential_integrity # :nodoc:
-        old = select_value("PRAGMA foreign_keys")
+        old = query_value("PRAGMA foreign_keys")
 
         begin
           execute("PRAGMA foreign_keys = OFF")
@@ -272,7 +290,7 @@ module ActiveRecord
         rename_table_indexes(table_name, new_name)
       end
 
-      # See: http://www.sqlite.org/lang_altertable.html
+      # See: https://www.sqlite.org/lang_altertable.html
       # SQLite has an additional restriction on the ALTER TABLE statement
       def valid_alter_table_type?(type)
         type.to_sym != :primary_key
@@ -337,7 +355,7 @@ module ActiveRecord
       alias :add_belongs_to :add_reference
 
       def foreign_keys(table_name)
-        fk_info = select_all("PRAGMA foreign_key_list(#{quote(table_name)})", "SCHEMA")
+        fk_info = exec_query("PRAGMA foreign_key_list(#{quote(table_name)})", "SCHEMA")
         fk_info.map do |row|
           options = {
             column: row["from"],
@@ -356,6 +374,10 @@ module ActiveRecord
       end
 
       private
+        def initialize_type_map(m = type_map)
+          super
+          register_class_with_limit m, %r(int)i, SQLite3Integer
+        end
 
         def table_structure(table_name)
           structure = exec_query("PRAGMA table_info(#{quote_table_name(table_name)})", "SCHEMA")
@@ -385,18 +407,21 @@ module ActiveRecord
           options[:id] = false
           create_table(to, options) do |definition|
             @definition = definition
-            @definition.primary_key(from_primary_key) if from_primary_key.present?
+            if from_primary_key.is_a?(Array)
+              @definition.primary_keys from_primary_key
+            end
             columns(from).each do |column|
               column_name = options[:rename] ?
                 (options[:rename][column.name] ||
                  options[:rename][column.name.to_sym] ||
                  column.name) : column.name
-              next if column_name == from_primary_key
 
               @definition.column(column_name, column.type,
                 limit: column.limit, default: column.default,
                 precision: column.precision, scale: column.scale,
-                null: column.null, collation: column.collation)
+                null: column.null, collation: column.collation,
+                primary_key: column_name == from_primary_key
+              )
             end
             yield @definition if block_given?
           end
@@ -409,6 +434,9 @@ module ActiveRecord
         def copy_table_indexes(from, to, rename = {})
           indexes(from).each do |index|
             name = index.name
+            # indexes sqlite creates for internal use start with `sqlite_` and
+            # don't need to be copied
+            next if name.starts_with?("sqlite_")
             if to == "a#{from}"
               name = "t#{name}"
             elsif from == "a#{to}"
@@ -443,7 +471,7 @@ module ActiveRecord
         end
 
         def sqlite_version
-          @sqlite_version ||= SQLite3Adapter::Version.new(select_value("SELECT sqlite_version(*)"))
+          @sqlite_version ||= SQLite3Adapter::Version.new(query_value("SELECT sqlite_version(*)"))
         end
 
         def translate_exception(exception, message)
@@ -511,6 +539,18 @@ module ActiveRecord
         def configure_connection
           execute("PRAGMA foreign_keys = ON", "SCHEMA")
         end
+
+        class SQLite3Integer < Type::Integer # :nodoc:
+          private
+            def _limit
+              # INTEGER storage class can be stored 8 bytes value.
+              # See https://www.sqlite.org/datatype3.html#storage_classes_and_datatypes
+              limit || 8
+            end
+        end
+
+        ActiveRecord::Type.register(:integer, SQLite3Integer, adapter: :sqlite3)
     end
+    ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, SQLite3Adapter)
   end
 end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "models/post"
 require "models/tagging"
@@ -38,6 +40,12 @@ class EagerAssociationTest < ActiveRecord::TestCase
     assert_nil member.favourite_club
   end
 
+  def test_should_work_inverse_of_with_eager_load
+    author = authors(:david)
+    assert_same author, author.posts.first.author
+    assert_same author, author.posts.eager_load(:comments).first.author
+  end
+
   def test_loading_with_one_association
     posts = Post.all.merge!(includes: :comments).to_a
     post = posts.find { |p| p.id == 1 }
@@ -66,6 +74,11 @@ class EagerAssociationTest < ActiveRecord::TestCase
     ).to_a
     assert_nil posts.detect { |p| p.author_id != authors(:david).id },
       "expected to find only david's posts"
+  end
+
+  def test_loading_with_scope_including_joins
+    assert_equal clubs(:boring_club), Member.preload(:general_club).find(1).general_club
+    assert_equal clubs(:boring_club), Member.eager_load(:general_club).find(1).general_club
   end
 
   def test_with_ordering
@@ -414,7 +427,7 @@ class EagerAssociationTest < ActiveRecord::TestCase
   def test_eager_association_loading_with_belongs_to_and_order_string_with_quoted_table_name
     quoted_posts_id = Comment.connection.quote_table_name("posts") + "." + Comment.connection.quote_column_name("id")
     assert_nothing_raised do
-      Comment.includes(:post).references(:posts).order(quoted_posts_id)
+      Comment.includes(:post).references(:posts).order(Arel.sql(quoted_posts_id))
     end
   end
 
@@ -515,6 +528,14 @@ class EagerAssociationTest < ActiveRecord::TestCase
   def test_eager_with_has_many_through_an_sti_join_model
     author = Author.all.merge!(includes: :special_post_comments, order: "authors.id").first
     assert_equal [comments(:does_it_hurt)], assert_no_queries { author.special_post_comments }
+  end
+
+  def test_preloading_has_many_through_with_implicit_source
+    authors = Author.includes(:very_special_comments).to_a
+    assert_no_queries do
+      special_comment_authors = authors.map { |author| [author.name, author.very_special_comments.size] }
+      assert_equal [["David", 1], ["Mary", 0], ["Bob", 0]], special_comment_authors
+    end
   end
 
   def test_eager_with_has_many_through_an_sti_join_model_with_conditions_on_both
@@ -848,23 +869,19 @@ class EagerAssociationTest < ActiveRecord::TestCase
     end
   end
 
-  def find_all_ordered(className, include = nil)
-    className.all.merge!(order: "#{className.table_name}.#{className.primary_key}", includes: include).to_a
-  end
-
   def test_limited_eager_with_order
     assert_equal(
       posts(:thinking, :sti_comments),
       Post.all.merge!(
         includes: [:author, :comments], where: { "authors.name" => "David" },
-        order: "UPPER(posts.title)", limit: 2, offset: 1
+        order: Arel.sql("UPPER(posts.title)"), limit: 2, offset: 1
       ).to_a
     )
     assert_equal(
       posts(:sti_post_and_comments, :sti_comments),
       Post.all.merge!(
         includes: [:author, :comments], where: { "authors.name" => "David" },
-        order: "UPPER(posts.title) DESC", limit: 2, offset: 1
+        order: Arel.sql("UPPER(posts.title) DESC"), limit: 2, offset: 1
       ).to_a
     )
   end
@@ -874,14 +891,14 @@ class EagerAssociationTest < ActiveRecord::TestCase
       posts(:thinking, :sti_comments),
       Post.all.merge!(
         includes: [:author, :comments], where: { "authors.name" => "David" },
-        order: ["UPPER(posts.title)", "posts.id"], limit: 2, offset: 1
+        order: [Arel.sql("UPPER(posts.title)"), "posts.id"], limit: 2, offset: 1
       ).to_a
     )
     assert_equal(
       posts(:sti_post_and_comments, :sti_comments),
       Post.all.merge!(
         includes: [:author, :comments], where: { "authors.name" => "David" },
-        order: ["UPPER(posts.title) DESC", "posts.id"], limit: 2, offset: 1
+        order: [Arel.sql("UPPER(posts.title) DESC"), "posts.id"], limit: 2, offset: 1
       ).to_a
     )
   end
@@ -1286,6 +1303,11 @@ class EagerAssociationTest < ActiveRecord::TestCase
     assert_equal projects.last.mentor.developers.first.contracts, projects.last.developers.last.contracts
   end
 
+  def test_preloading_has_many_through_with_custom_scope
+    project = Project.includes(:developers_named_david_with_hash_conditions).find(projects(:active_record).id)
+    assert_equal [developers(:david)], project.developers_named_david_with_hash_conditions
+  end
+
   test "scoping with a circular preload" do
     assert_equal Comment.find(1), Comment.preload(post: :comments).scoping { Comment.find(1) }
   end
@@ -1479,9 +1501,18 @@ class EagerAssociationTest < ActiveRecord::TestCase
     assert_equal posts(:welcome), post
   end
 
+  test "eager-loading with a polymorphic association and using the existential predicate" do
+    assert_equal true, authors(:david).essays.eager_load(:writer).exists?
+  end
+
   # CollectionProxy#reader is expensive, so the preloader avoids calling it.
   test "preloading has_many_through association avoids calling association.reader" do
     ActiveRecord::Associations::HasManyAssociation.any_instance.expects(:reader).never
     Author.preload(:readonly_comments).first!
   end
+
+  private
+    def find_all_ordered(klass, include = nil)
+      klass.order("#{klass.table_name}.#{klass.primary_key}").includes(include).to_a
+    end
 end

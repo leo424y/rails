@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "active_support/core_ext/hash/indifferent_access"
 
 module ActiveRecord
@@ -30,7 +32,7 @@ module ActiveRecord
   # for differentiating between them or reloading the right type with find.
   #
   # Note, all the attributes for all the cases are kept in the same table. Read more:
-  # http://www.martinfowler.com/eaaCatalog/singleTableInheritance.html
+  # https://www.martinfowler.com/eaaCatalog/singleTableInheritance.html
   #
   module Inheritance
     extend ActiveSupport::Concern
@@ -245,7 +247,7 @@ module ActiveRecord
       def ensure_proper_type
         klass = self.class
         if klass.finder_needs_type_condition?
-          write_attribute(klass.inheritance_column, klass.sti_name)
+          _write_attribute(klass.inheritance_column, klass.sti_name)
         end
       end
   end

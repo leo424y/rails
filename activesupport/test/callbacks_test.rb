@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "abstract_unit"
 
 module CallbacksTest
@@ -191,13 +193,6 @@ module CallbacksTest
     before_save Proc.new { |r| r.history << "b00m" }, if: :no
     before_save Proc.new { |r| r.history << [:before_save, :symbol] }, unless: :no
     before_save Proc.new { |r| r.history << "b00m" }, unless: :yes
-    # string
-    ActiveSupport::Deprecation.silence do
-      before_save Proc.new { |r| r.history << [:before_save, :string] }, if: "yes"
-      before_save Proc.new { |r| r.history << "b00m" }, if: "no"
-      before_save Proc.new { |r| r.history << [:before_save, :string] }, unless: "no"
-      before_save Proc.new { |r| r.history << "b00m" }, unless: "yes"
-    end
     # Combined if and unless
     before_save Proc.new { |r| r.history << [:before_save, :combined_symbol] }, if: :yes, unless: :no
     before_save Proc.new { |r| r.history << "b00m" }, if: :yes, unless: :yes
@@ -590,8 +585,6 @@ module CallbacksTest
         [:before_save, :proc],
         [:before_save, :symbol],
         [:before_save, :symbol],
-        [:before_save, :string],
-        [:before_save, :string],
         [:before_save, :combined_symbol],
       ], person.history
     end
@@ -1180,14 +1173,15 @@ module CallbacksTest
     end
   end
 
-  class DeprecatedWarningTest < ActiveSupport::TestCase
-    def test_deprecate_string_conditional_options
+  class NotSupportedStringConditionalTest < ActiveSupport::TestCase
+    def test_string_conditional_options
       klass = Class.new(Record)
 
-      assert_deprecated { klass.before_save :tweedle, if: "true" }
-      assert_deprecated { klass.after_save :tweedle, unless: "false" }
-      assert_deprecated { klass.skip_callback :save, :before, :tweedle, if: "true" }
-      assert_deprecated { klass.skip_callback :save, :after, :tweedle, unless: "false" }
+      assert_raises(ArgumentError) { klass.before_save :tweedle, if: ["true"] }
+      assert_raises(ArgumentError) { klass.before_save :tweedle, if: "true" }
+      assert_raises(ArgumentError) { klass.after_save :tweedle, unless: "false" }
+      assert_raises(ArgumentError) { klass.skip_callback :save, :before, :tweedle, if: "true" }
+      assert_raises(ArgumentError) { klass.skip_callback :save, :after, :tweedle, unless: "false" }
     end
   end
 

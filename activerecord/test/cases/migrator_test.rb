@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "cases/migration/helper"
 
@@ -63,6 +65,26 @@ class MigratorTest < ActiveRecord::TestCase
     assert_raises(ActiveRecord::UnknownMigrationVersionError) do
       list = [ActiveRecord::Migration.new("Foo", 1), ActiveRecord::Migration.new("Bar", 2)]
       ActiveRecord::Migrator.new(:up, list, 3).run
+    end
+
+    assert_raises(ActiveRecord::UnknownMigrationVersionError) do
+      list = [ActiveRecord::Migration.new("Foo", 1), ActiveRecord::Migration.new("Bar", 2)]
+      ActiveRecord::Migrator.new(:up, list, -1).run
+    end
+
+    assert_raises(ActiveRecord::UnknownMigrationVersionError) do
+      list = [ActiveRecord::Migration.new("Foo", 1), ActiveRecord::Migration.new("Bar", 2)]
+      ActiveRecord::Migrator.new(:up, list, 0).run
+    end
+
+    assert_raises(ActiveRecord::UnknownMigrationVersionError) do
+      list = [ActiveRecord::Migration.new("Foo", 1), ActiveRecord::Migration.new("Bar", 2)]
+      ActiveRecord::Migrator.new(:up, list, 3).migrate
+    end
+
+    assert_raises(ActiveRecord::UnknownMigrationVersionError) do
+      list = [ActiveRecord::Migration.new("Foo", 1), ActiveRecord::Migration.new("Bar", 2)]
+      ActiveRecord::Migrator.new(:up, list, -1).migrate
     end
   end
 

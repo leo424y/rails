@@ -138,7 +138,7 @@ defaults to `:debug` for all environments. The available log levels are: `:debug
 
 * `config.reload_classes_only_on_change` enables or disables reloading of classes only when tracked files change. By default tracks everything on autoload paths and is set to `true`. If `config.cache_classes` is `true`, this option is ignored.
 
-* `secrets.secret_key_base` is used for specifying a key which allows sessions for the application to be verified against a known secure key to prevent tampering. Applications get `secrets.secret_key_base` initialized to a random key present in `config/secrets.yml`.
+* `secret_key_base` is used for specifying a key which allows sessions for the application to be verified against a known secure key to prevent tampering. Applications get a random generated key in test and development environments, other environments should set one in `config/credentials.yml.enc`.
 
 * `config.public_file_server.enabled` configures Rails to serve static files from the public directory. This option defaults to `true`, but in the production environment it is set to `false` because the server software (e.g. NGINX or Apache) used to run the application should serve static files instead. If you are running or testing your app in production mode using WEBrick (it is not recommended to use WEBrick in production) set the option to `true.` Otherwise, you won't be able to use page caching and request for files that exist under the public directory.
 
@@ -375,6 +375,28 @@ The MySQL adapter adds one additional configuration option:
 
 * `ActiveRecord::ConnectionAdapters::Mysql2Adapter.emulate_booleans` controls whether Active Record will consider all `tinyint(1)` columns as booleans. Defaults to `true`.
 
+The SQLite3Adapter adapter adds one additional configuration option:
+
+* `ActiveRecord::ConnectionAdapters::SQLite3Adapter.represent_boolean_as_integer`
+indicates whether boolean values are stored in sqlite3 databases as 1 and 0 or
+'t' and 'f'. Leaving `ActiveRecord::ConnectionAdapters::SQLite3Adapter.represent_boolean_as_integer`
+set to false is deprecated. SQLite databases have used 't' and 'f' to serialize
+boolean values and must have old data converted to 1 and 0 (its native boolean
+serialization) before setting this flag to true. Conversion can be accomplished
+by setting up a Rake task which runs
+
+    ```ruby
+    ExampleModel.where("boolean_column = 't'").update_all(boolean_column: 1)
+    ExampleModel.where("boolean_column = 'f'").update_all(boolean_column: 0)
+    ```
+
+  for all models and all boolean columns, after which the flag must be set to true
+by adding the following to your `application.rb` file:
+
+    ```ruby
+    Rails.application.config.active_record.sqlite3.represent_boolean_as_integer = true
+    ```
+
 The schema dumper adds one additional configuration option:
 
 * `ActiveRecord::SchemaDumper.ignore_tables` accepts an array of tables that should _not_ be included in any generated schema file. This setting is ignored unless `config.active_record.schema_format == :ruby`.
@@ -400,6 +422,8 @@ The schema dumper adds one additional configuration option:
 * `config.action_controller.forgery_protection_origin_check` configures whether the HTTP `Origin` header should be checked against the site's origin as an additional CSRF defense.
 
 * `config.action_controller.per_form_csrf_tokens` configures whether CSRF tokens are only valid for the method/action they were generated for.
+
+* `config.action_controller.default_protect_from_forgery` determines whether forgery protection is added on `ActionController:Base`. This is false by default, but enabled when loading defaults for Rails 5.2.
 
 * `config.action_controller.relative_url_root` can be used to tell Rails that you are [deploying to a subdirectory](configuring.html#deploy-to-a-subdirectory-relative-url-root). The default is `ENV['RAILS_RELATIVE_URL_ROOT']`.
 
@@ -462,6 +486,15 @@ Defaults to `'signed cookie'`.
 * `config.action_dispatch.authenticated_encrypted_cookie_salt` sets the
   authenticated encrypted cookie salt. Defaults to `'authenticated encrypted
   cookie'`.
+
+* `config.action_dispatch.encrypted_cookie_cipher` sets the cipher to be
+  used for encrypted cookies. This defaults to `"aes-256-gcm"`.
+
+* `config.action_dispatch.signed_cookie_digest` sets the digest to be
+  used for signed cookies. This defaults to `"SHA1"`.
+
+* `config.action_dispatch.cookies_rotations` allows rotating
+  secrets, ciphers, and digests for encrypted and signed cookies.
 
 * `config.action_dispatch.perform_deep_munge` configures whether `deep_munge`
   method should be performed on the parameters. See [Security Guide](security.html#unsafe-query-generation)
@@ -539,11 +572,13 @@ Defaults to `'signed cookie'`.
   error should be raised for missing translations.
 
 * `config.action_view.automatically_disable_submit_tag` determines whether
-  submit_tag should automatically disable on click, this defaults to `true`.
+  `submit_tag` should automatically disable on click, this defaults to `true`.
 
 * `config.action_view.debug_missing_translation` determines whether to wrap the missing translations key in a `<span>` tag or not. This defaults to `true`.
 
 * `config.action_view.form_with_generates_remote_forms` determines whether `form_with` generates remote forms or not. This defaults to `true`.
+
+* `config.action_view.form_with_generates_ids` determines whether `form_with` generates ids on inputs. This defaults to `true`.
 
 ### Configuring Action Mailer
 
@@ -940,7 +975,7 @@ By default Rails ships with three environments: "development", "test", and "prod
 
 Imagine you have a server which mirrors the production environment but is only used for testing. Such a server is commonly called a "staging server". To define an environment called "staging" for this server, just create a file called `config/environments/staging.rb`. Please use the contents of any existing file in `config/environments` as a starting point and make the necessary changes from there.
 
-That environment is no different than the default ones, start a server with `rails server -e staging`, a console with `rails console staging`, `Rails.env.staging?` works, etc.
+That environment is no different than the default ones, start a server with `rails server -e staging`, a console with `rails console -e staging`, `Rails.env.staging?` works, etc.
 
 
 ### Deploy to a subdirectory (relative url root)
@@ -970,17 +1005,17 @@ Deploying your application using a reverse proxy has definite advantages over tr
 
 Many modern web servers can be used as a proxy server to balance third-party elements such as caching servers or application servers.
 
-One such application server you can use is [Unicorn](http://unicorn.bogomips.org/) to run behind a reverse proxy.
+One such application server you can use is [Unicorn](https://bogomips.org/unicorn/) to run behind a reverse proxy.
 
 In this case, you would need to configure the proxy server (NGINX, Apache, etc) to accept connections from your application server (Unicorn). By default Unicorn will listen for TCP connections on port 8080, but you can change the port or configure it to use sockets instead.
 
-You can find more information in the [Unicorn readme](http://unicorn.bogomips.org/README.html) and understand the [philosophy](http://unicorn.bogomips.org/PHILOSOPHY.html) behind it.
+You can find more information in the [Unicorn readme](https://bogomips.org/unicorn/README.html) and understand the [philosophy](https://bogomips.org/unicorn/PHILOSOPHY.html) behind it.
 
 Once you've configured the application server, you must proxy requests to it by configuring your web server appropriately. For example your NGINX config may include:
 
 ```
 upstream application_server {
-  server 0.0.0.0:8080
+  server 0.0.0.0:8080;
 }
 
 server {
@@ -1002,7 +1037,7 @@ server {
 }
 ```
 
-Be sure to read the [NGINX documentation](http://nginx.org/en/docs/) for the most up-to-date information.
+Be sure to read the [NGINX documentation](https://nginx.org/en/docs/) for the most up-to-date information.
 
 
 Rails Environment Settings
@@ -1024,7 +1059,7 @@ After loading the framework and any gems in your application, Rails turns to loa
 
 NOTE: You can use subfolders to organize your initializers if you like, because Rails will look into the whole file hierarchy from the initializers folder on down.
 
-TIP: If you have any ordering dependency in your initializers, you can control the load order through naming. Initializer files are loaded in alphabetical order by their path. For example, `01_critical.rb` will be loaded before `02_normal.rb`.
+TIP: While Rails supports numbering of initializer file names for load ordering purposes, a better technique is to place any code that need to load in a specific order within the same file. This reduces file name churn, makes dependencies more explicit, and can help surface new concepts within your application.
 
 Initialization events
 ---------------------
@@ -1284,7 +1319,7 @@ know which pages it is allowed to index.
 
 Rails creates this file for you inside the `/public` folder. By default, it allows
 search engines to index all pages of your application. If you want to block
-indexing on all pages of you application, use this:
+indexing on all pages of your application, use this:
 
 ```
 User-agent: *

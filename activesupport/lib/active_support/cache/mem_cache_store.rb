@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 begin
   require "dalli"
 rescue LoadError => e
@@ -12,7 +14,7 @@ require "active_support/core_ext/array/extract_options"
 module ActiveSupport
   module Cache
     # A cache store implementation which stores data in Memcached:
-    # http://memcached.org/
+    # https://memcached.org
     #
     # This is currently the most popular cache store for production websites.
     #
@@ -120,7 +122,7 @@ module ActiveSupport
         options = merged_options(options)
         instrument(:increment, name, amount: amount) do
           rescue_error_with nil do
-            @data.incr(normalize_key(name, options), amount)
+            @data.incr(normalize_key(name, options), amount, options[:expires_in])
           end
         end
       end
@@ -133,7 +135,7 @@ module ActiveSupport
         options = merged_options(options)
         instrument(:decrement, name, amount: amount) do
           rescue_error_with nil do
-            @data.decr(normalize_key(name, options), amount)
+            @data.decr(normalize_key(name, options), amount, options[:expires_in])
           end
         end
       end

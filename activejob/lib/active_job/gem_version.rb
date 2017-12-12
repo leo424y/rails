@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ActiveJob
   # Returns the version of the currently loaded Active Job as a <tt>Gem::Version</tt>
   def self.gem_version
@@ -8,7 +10,7 @@ module ActiveJob
     MAJOR = 5
     MINOR = 2
     TINY  = 0
-    PRE   = "alpha"
+    PRE   = "beta2"
 
     STRING = [MAJOR, MINOR, TINY, PRE].compact.join(".")
   end

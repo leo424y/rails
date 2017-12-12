@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "models/post"
 require "models/author"
@@ -883,10 +885,15 @@ class BasicsTest < ActiveRecord::TestCase
 
   def test_bignum
     company = Company.find(1)
-    company.rating = 2147483647
+    company.rating = 2147483648
     company.save
     company = Company.find(1)
-    assert_equal 2147483647, company.rating
+    assert_equal 2147483648, company.rating
+  end
+
+  def test_bignum_pk
+    company = Company.create!(id: 2147483648, name: "foo")
+    assert_equal company, Company.find(company.id)
   end
 
   # TODO: extend defaults tests to other databases!
@@ -1052,29 +1059,15 @@ class BasicsTest < ActiveRecord::TestCase
 
   def test_count_with_join
     res = Post.count_by_sql "SELECT COUNT(*) FROM posts LEFT JOIN comments ON posts.id=comments.post_id WHERE posts.#{QUOTED_TYPE} = 'Post'"
-
     res2 = Post.where("posts.#{QUOTED_TYPE} = 'Post'").joins("LEFT JOIN comments ON posts.id=comments.post_id").count
     assert_equal res, res2
 
-    res3 = nil
-    assert_nothing_raised do
-      res3 = Post.where("posts.#{QUOTED_TYPE} = 'Post'").joins("LEFT JOIN comments ON posts.id=comments.post_id").count
-    end
-    assert_equal res, res3
-
     res4 = Post.count_by_sql "SELECT COUNT(p.id) FROM posts p, comments co WHERE p.#{QUOTED_TYPE} = 'Post' AND p.id=co.post_id"
-    res5 = nil
-    assert_nothing_raised do
-      res5 = Post.where("p.#{QUOTED_TYPE} = 'Post' AND p.id=co.post_id").joins("p, comments co").select("p.id").count
-    end
-
+    res5 = Post.where("p.#{QUOTED_TYPE} = 'Post' AND p.id=co.post_id").joins("p, comments co").select("p.id").count
     assert_equal res4, res5
 
     res6 = Post.count_by_sql "SELECT COUNT(DISTINCT p.id) FROM posts p, comments co WHERE p.#{QUOTED_TYPE} = 'Post' AND p.id=co.post_id"
-    res7 = nil
-    assert_nothing_raised do
-      res7 = Post.where("p.#{QUOTED_TYPE} = 'Post' AND p.id=co.post_id").joins("p, comments co").select("p.id").distinct.count
-    end
+    res7 = Post.where("p.#{QUOTED_TYPE} = 'Post' AND p.id=co.post_id").joins("p, comments co").select("p.id").distinct.count
     assert_equal res6, res7
   end
 
@@ -1449,17 +1442,57 @@ class BasicsTest < ActiveRecord::TestCase
     cache_columns = Developer.connection.schema_cache.columns_hash(Developer.table_name)
     assert_includes cache_columns.keys, "first_name"
     assert_not_includes Developer.columns_hash.keys, "first_name"
+    assert_not_includes SubDeveloper.columns_hash.keys, "first_name"
+    assert_not_includes SymbolIgnoredDeveloper.columns_hash.keys, "first_name"
   end
 
   test "ignored columns have no attribute methods" do
     refute Developer.new.respond_to?(:first_name)
     refute Developer.new.respond_to?(:first_name=)
     refute Developer.new.respond_to?(:first_name?)
+    refute SubDeveloper.new.respond_to?(:first_name)
+    refute SubDeveloper.new.respond_to?(:first_name=)
+    refute SubDeveloper.new.respond_to?(:first_name?)
+    refute SymbolIgnoredDeveloper.new.respond_to?(:first_name)
+    refute SymbolIgnoredDeveloper.new.respond_to?(:first_name=)
+    refute SymbolIgnoredDeveloper.new.respond_to?(:first_name?)
   end
 
   test "ignored columns don't prevent explicit declaration of attribute methods" do
     assert Developer.new.respond_to?(:last_name)
     assert Developer.new.respond_to?(:last_name=)
     assert Developer.new.respond_to?(:last_name?)
+    assert SubDeveloper.new.respond_to?(:last_name)
+    assert SubDeveloper.new.respond_to?(:last_name=)
+    assert SubDeveloper.new.respond_to?(:last_name?)
+    assert SymbolIgnoredDeveloper.new.respond_to?(:last_name)
+    assert SymbolIgnoredDeveloper.new.respond_to?(:last_name=)
+    assert SymbolIgnoredDeveloper.new.respond_to?(:last_name?)
+  end
+
+  test "ignored columns are stored as an array of string" do
+    assert_equal(%w(first_name last_name), Developer.ignored_columns)
+    assert_equal(%w(first_name last_name), SymbolIgnoredDeveloper.ignored_columns)
+  end
+
+  test "when #reload called, ignored columns' attribute methods are not defined" do
+    developer = Developer.create!(name: "Developer")
+    refute developer.respond_to?(:first_name)
+    refute developer.respond_to?(:first_name=)
+
+    developer.reload
+
+    refute developer.respond_to?(:first_name)
+    refute developer.respond_to?(:first_name=)
+  end
+
+  test "ignored columns not included in SELECT" do
+    query = Developer.all.to_sql.downcase
+
+    # ignored column
+    refute query.include?("first_name")
+
+    # regular column
+    assert query.include?("name")
   end
 end

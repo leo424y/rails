@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ActiveSupport
   module Testing
     module Isolation
@@ -53,7 +55,7 @@ module ActiveSupport
           write.close
           result = read.read
           Process.wait2(pid)
-          return result.unpack("m")[0]
+          result.unpack("m")[0]
         end
       end
 

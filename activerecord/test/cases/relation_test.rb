@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "models/post"
 require "models/comment"
@@ -7,24 +9,6 @@ require "models/rating"
 module ActiveRecord
   class RelationTest < ActiveRecord::TestCase
     fixtures :posts, :comments, :authors, :author_addresses, :ratings
-
-    FakeKlass = Struct.new(:table_name, :name) do
-      extend ActiveRecord::Delegation::DelegateCache
-
-      inherited self
-
-      def self.connection
-        Post.connection
-      end
-
-      def self.table_name
-        "fake_table"
-      end
-
-      def self.sanitize_sql_for_order(sql)
-        sql
-      end
-    end
 
     def test_construction
       relation = Relation.new(FakeKlass, :b, nil)
@@ -70,8 +54,8 @@ module ActiveRecord
 
     def test_has_values
       relation = Relation.new(Post, Post.arel_table, Post.predicate_builder)
-      relation.where! relation.table[:id].eq(10)
-      assert_equal({ id: 10 }, relation.where_values_hash)
+      relation.where!(id: 10)
+      assert_equal({ "id" => 10 }, relation.where_values_hash)
     end
 
     def test_values_wrong_table
@@ -84,14 +68,9 @@ module ActiveRecord
       relation = Relation.new(Post, Post.arel_table, Post.predicate_builder)
       left     = relation.table[:id].eq(10)
       right    = relation.table[:id].eq(10)
-      combine  = left.and right
+      combine  = left.or(right)
       relation.where! combine
       assert_equal({}, relation.where_values_hash)
-    end
-
-    def test_table_name_delegates_to_klass
-      relation = Relation.new(FakeKlass.new("posts"), :b, Post.predicate_builder)
-      assert_equal "posts", relation.table_name
     end
 
     def test_scope_for_create
@@ -101,28 +80,27 @@ module ActiveRecord
 
     def test_create_with_value
       relation = Relation.new(Post, Post.arel_table, Post.predicate_builder)
-      hash = { hello: "world" }
-      relation.create_with_value = hash
-      assert_equal hash, relation.scope_for_create
+      relation.create_with_value = { hello: "world" }
+      assert_equal({ "hello" => "world" }, relation.scope_for_create)
     end
 
     def test_create_with_value_with_wheres
       relation = Relation.new(Post, Post.arel_table, Post.predicate_builder)
-      relation.where! relation.table[:id].eq(10)
+      assert_equal({}, relation.scope_for_create)
+
+      relation.where!(id: 10)
+      assert_equal({ "id" => 10 }, relation.scope_for_create)
+
       relation.create_with_value = { hello: "world" }
-      assert_equal({ hello: "world", id: 10 }, relation.scope_for_create)
+      assert_equal({ "hello" => "world", "id" => 10 }, relation.scope_for_create)
     end
 
-    # FIXME: is this really wanted or expected behavior?
-    def test_scope_for_create_is_cached
+    def test_empty_scope
       relation = Relation.new(Post, Post.arel_table, Post.predicate_builder)
-      assert_equal({}, relation.scope_for_create)
+      assert relation.empty_scope?
 
-      relation.where! relation.table[:id].eq(10)
-      assert_equal({}, relation.scope_for_create)
-
-      relation.create_with_value = { hello: "world" }
-      assert_equal({}, relation.scope_for_create)
+      relation.merge!(relation)
+      assert relation.empty_scope?
     end
 
     def test_bad_constants_raise_errors
@@ -210,7 +188,7 @@ module ActiveRecord
 
       relation = Relation.new(klass, :b, nil)
       relation.merge!(where: ["foo = ?", "bar"])
-      assert_equal Relation::WhereClause.new(["foo = bar"], []), relation.where_clause
+      assert_equal Relation::WhereClause.new(["foo = bar"]), relation.where_clause
     end
 
     def test_merging_readonly_false
@@ -296,9 +274,23 @@ module ActiveRecord
       assert_equal({ 2 => 1, 4 => 3, 5 => 1 }, authors(:david).posts.merge(posts_with_special_comments_with_ratings).count)
     end
 
+    def test_relation_merging_keeps_joining_order
+      authors  = Author.where(id: 1)
+      posts    = Post.joins(:author).merge(authors)
+      comments = Comment.joins(:post).merge(posts)
+      ratings  = Rating.joins(:comment).merge(comments)
+
+      assert_equal 3, ratings.count
+    end
+
     class EnsureRoundTripTypeCasting < ActiveRecord::Type::Value
       def type
         :string
+      end
+
+      def cast(value)
+        raise value unless value == "value from user"
+        "cast value"
       end
 
       def deserialize(value)
@@ -307,7 +299,7 @@ module ActiveRecord
       end
 
       def serialize(value)
-        raise value unless value == "value from user"
+        raise value unless value == "cast value"
         "type cast for database"
       end
     end

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 $:.unshift File.expand_path("lib", __dir__)
 $:.unshift File.expand_path("fixtures/helpers", __dir__)
 $:.unshift File.expand_path("fixtures/alternate_helpers", __dir__)
@@ -42,7 +44,7 @@ module Rails
       @_env ||= ActiveSupport::StringInquirer.new(ENV["RAILS_ENV"] || ENV["RACK_ENV"] || "test")
     end
 
-    def root; end;
+    def root; end
   end
 end
 
@@ -175,7 +177,7 @@ end
 class Rack::TestCase < ActionDispatch::IntegrationTest
   def self.testing(klass = nil)
     if klass
-      @testing = "/#{klass.name.underscore}".sub!(/_controller$/, "")
+      @testing = "/#{klass.name.underscore}".sub(/_controller$/, "")
     else
       @testing
     end
@@ -446,4 +448,12 @@ end
 
 class DrivenBySeleniumWithChrome < ActionDispatch::SystemTestCase
   driven_by :selenium, using: :chrome
+end
+
+class DrivenBySeleniumWithHeadlessChrome < ActionDispatch::SystemTestCase
+  driven_by :selenium, using: :headless_chrome
+end
+
+class DrivenBySeleniumWithHeadlessFirefox < ActionDispatch::SystemTestCase
+  driven_by :selenium, using: :headless_firefox
 end

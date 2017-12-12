@@ -1,3 +1,7 @@
+# frozen_string_literal: true
+
+gem "capybara", "~> 2.15"
+
 require "capybara/dsl"
 require "capybara/minitest"
 require "action_controller"
@@ -5,6 +9,7 @@ require "action_dispatch/system_testing/driver"
 require "action_dispatch/system_testing/server"
 require "action_dispatch/system_testing/test_helpers/screenshot_helper"
 require "action_dispatch/system_testing/test_helpers/setup_and_teardown"
+require "action_dispatch/system_testing/test_helpers/undef_methods"
 
 module ActionDispatch
   # = System Testing
@@ -88,6 +93,7 @@ module ActionDispatch
     include Capybara::Minitest::Assertions
     include SystemTesting::TestHelpers::SetupAndTeardown
     include SystemTesting::TestHelpers::ScreenshotHelper
+    include SystemTesting::TestHelpers::UndefMethods
 
     def initialize(*) # :nodoc:
       super
@@ -115,14 +121,22 @@ module ActionDispatch
     #
     #   driven_by :poltergeist
     #
+    #   driven_by :selenium, screen_size: [800, 800]
+    #
+    #   driven_by :selenium, using: :chrome
+    #
+    #   driven_by :selenium, using: :headless_chrome
+    #
     #   driven_by :selenium, using: :firefox
     #
-    #   driven_by :selenium, screen_size: [800, 800]
+    #   driven_by :selenium, using: :headless_firefox
     def self.driven_by(driver, using: :chrome, screen_size: [1400, 1400], options: {})
       self.driver = SystemTesting::Driver.new(driver, using: using, screen_size: screen_size, options: options)
     end
 
     driven_by :selenium
+
+    ActiveSupport.run_load_hooks(:action_dispatch_system_test_case, self)
   end
 
   SystemTestCase.start_application

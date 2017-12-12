@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 module ActiveRecord
   module ConnectionAdapters
     module MySQL
       module DatabaseStatements
         # Returns an ActiveRecord::Result instance.
-        def select_all(arel, name = nil, binds = [], preparable: nil) # :nodoc:
+        def select_all(*) # :nodoc:
           result = if ExplainRegistry.collect? && prepared_statements
             unprepared_statement { super }
           else
@@ -11,6 +13,10 @@ module ActiveRecord
           end
           @connection.next_result while @connection.more_results?
           result
+        end
+
+        def query(sql, name = nil) # :nodoc:
+          execute(sql, name).to_a
         end
 
         # Executes the SQL statement in the context of this connection.

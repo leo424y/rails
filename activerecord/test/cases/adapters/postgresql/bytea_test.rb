@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "support/schema_dumping_helper"
 
@@ -47,7 +49,7 @@ class PostgresqlByteaTest < ActiveRecord::PostgreSQLTestCase
   end
 
   def test_type_cast_binary_value
-    data = "\u001F\x8B".force_encoding("BINARY")
+    data = "\u001F\x8B".dup.force_encoding("BINARY")
     assert_equal(data, @type.deserialize(data))
   end
 

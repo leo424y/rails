@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "abstract_unit"
 require "active_support/time"
 require "core_ext/date_and_time_behavior"
@@ -174,10 +176,6 @@ class TimeExtCalculationsTest < ActiveSupport::TestCase
 
   def test_end_of_minute
     assert_equal Time.local(2005, 2, 4, 19, 30, 59, Rational(999999999, 1000)), Time.local(2005, 2, 4, 19, 30, 10).end_of_minute
-  end
-
-  def test_last_year
-    assert_equal Time.local(2004, 6, 5, 10),  Time.local(2005, 6, 5, 10, 0, 0).last_year
   end
 
   def test_ago
@@ -660,10 +658,6 @@ class TimeExtCalculationsTest < ActiveSupport::TestCase
     Time.stub(:now, Time.utc(2008)) do
       assert_equal 366, Time.days_in_year
     end
-  end
-
-  def test_last_month_on_31st
-    assert_equal Time.local(2004, 2, 29), Time.local(2004, 3, 31).last_month
   end
 
   def test_xmlschema_is_available

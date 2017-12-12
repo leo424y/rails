@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "active_support/core_ext/enumerable"
 require "active_support/core_ext/string/conversions"
 require "active_support/core_ext/module/remove_method"
@@ -138,26 +140,6 @@ module ActiveRecord
   class HasOneThroughCantAssociateThroughHasOneOrManyReflection < ThroughCantAssociateThroughHasOneOrManyReflection #:nodoc:
   end
 
-  class HasManyThroughCantAssociateNewRecords < ActiveRecordError #:nodoc:
-    def initialize(owner = nil, reflection = nil)
-      if owner && reflection
-        super("Cannot associate new records through '#{owner.class.name}##{reflection.name}' on '#{reflection.source_reflection.class_name rescue nil}##{reflection.source_reflection.name rescue nil}'. Both records must have an id in order to create the has_many :through record associating them.")
-      else
-        super("Cannot associate new records.")
-      end
-    end
-  end
-
-  class HasManyThroughCantDissociateNewRecords < ActiveRecordError #:nodoc:
-    def initialize(owner = nil, reflection = nil)
-      if owner && reflection
-        super("Cannot dissociate new records through '#{owner.class.name}##{reflection.name}' on '#{reflection.source_reflection.class_name rescue nil}##{reflection.source_reflection.name rescue nil}'. Both records must have an id in order to delete the has_many :through record associating them.")
-      else
-        super("Cannot dissociate new records.")
-      end
-    end
-  end
-
   class ThroughNestedAssociationsAreReadonly < ActiveRecordError #:nodoc:
     def initialize(owner = nil, reflection = nil)
       if owner && reflection
@@ -187,16 +169,6 @@ module ActiveRecord
     end
   end
 
-  class ReadOnlyAssociation < ActiveRecordError #:nodoc:
-    def initialize(reflection = nil)
-      if reflection
-        super("Cannot add to a has_many :through association. Try adding to #{reflection.through_reflection.name.inspect}.")
-      else
-        super("Read-only reflection error.")
-      end
-    end
-  end
-
   # This error is raised when trying to destroy a parent instance in N:1 or 1:1 associations
   # (has_many, has_one) when there is at least 1 child associated instance.
   # ex: if @project.tasks.size > 0, DeleteRestrictionError will be raised when trying to destroy @project
@@ -222,13 +194,6 @@ module ActiveRecord
     autoload :CollectionAssociation
     autoload :ForeignAssociation
     autoload :CollectionProxy
-
-    autoload :BelongsToAssociation
-    autoload :BelongsToPolymorphicAssociation
-    autoload :HasManyAssociation
-    autoload :HasManyThroughAssociation
-    autoload :HasOneAssociation
-    autoload :HasOneThroughAssociation
     autoload :ThroughAssociation
 
     module Builder #:nodoc:
@@ -243,6 +208,13 @@ module ActiveRecord
     end
 
     eager_autoload do
+      autoload :BelongsToAssociation
+      autoload :BelongsToPolymorphicAssociation
+      autoload :HasManyAssociation
+      autoload :HasManyThroughAssociation
+      autoload :HasOneAssociation
+      autoload :HasOneThroughAssociation
+
       autoload :Preloader
       autoload :JoinDependency
       autoload :AssociationScope
@@ -347,6 +319,7 @@ module ActiveRecord
       #   build_other(attributes={})        |     X      |              |    X
       #   create_other(attributes={})       |     X      |              |    X
       #   create_other!(attributes={})      |     X      |              |    X
+      #   reload_other                      |     X      |      X       |    X
       #
       # === Collection associations (one-to-many / many-to-many)
       #                                     |       |          | has_many
@@ -376,6 +349,7 @@ module ActiveRecord
       #   others.exists?                    |   X   |    X     |    X
       #   others.distinct                   |   X   |    X     |    X
       #   others.reset                      |   X   |    X     |    X
+      #   others.reload                     |   X   |    X     |    X
       #
       # === Overriding generated methods
       #
@@ -479,14 +453,14 @@ module ActiveRecord
       # The tables for these classes could look something like:
       #
       #   CREATE TABLE users (
-      #     id int NOT NULL auto_increment,
-      #     account_id int default NULL,
+      #     id bigint NOT NULL auto_increment,
+      #     account_id bigint default NULL,
       #     name varchar default NULL,
       #     PRIMARY KEY  (id)
       #   )
       #
       #   CREATE TABLE accounts (
-      #     id int NOT NULL auto_increment,
+      #     id bigint NOT NULL auto_increment,
       #     name varchar default NULL,
       #     PRIMARY KEY  (id)
       #   )
@@ -553,9 +527,8 @@ module ActiveRecord
       #     has_many :birthday_events, ->(user) { where(starts_on: user.birthday) }, class_name: 'Event'
       #   end
       #
-      # Note: Joining, eager loading and preloading of these associations is not fully possible.
+      # Note: Joining, eager loading and preloading of these associations is not possible.
       # These operations happen before instance creation and the scope will be called with a +nil+ argument.
-      # This can lead to unexpected behavior and is deprecated.
       #
       # == Association callbacks
       #
@@ -846,7 +819,7 @@ module ActiveRecord
       #   project.milestones             # fetches milestones from the database
       #   project.milestones.size        # uses the milestone cache
       #   project.milestones.empty?      # uses the milestone cache
-      #   project.milestones(true).size  # fetches milestones from the database
+      #   project.milestones.reload.size # fetches milestones from the database
       #   project.milestones             # uses the milestone cache
       #
       # == Eager loading of associations
@@ -1188,8 +1161,8 @@ module ActiveRecord
         # <tt>has_many :clients</tt> would add among others <tt>clients.empty?</tt>.
         #
         # [collection]
-        #   Returns an array of all the associated objects.
-        #   An empty array is returned if none are found.
+        #   Returns a Relation of all the associated objects.
+        #   An empty Relation is returned if none are found.
         # [collection<<(object, ...)]
         #   Adds one or more objects to the collection by setting their foreign keys to the collection's primary key.
         #   Note that this operation instantly fires update SQL without waiting for the save or update call on the
@@ -1246,6 +1219,9 @@ module ActiveRecord
         # [collection.create!(attributes = {})]
         #   Does the same as <tt>collection.create</tt>, but raises ActiveRecord::RecordInvalid
         #   if the record is invalid.
+        # [collection.reload]
+        #   Returns a Relation of all of the associated objects, forcing a database read.
+        #   An empty Relation is returned if none are found.
         #
         # === Example
         #
@@ -1265,6 +1241,7 @@ module ActiveRecord
         # * <tt>Firm#clients.build</tt> (similar to <tt>Client.new("firm_id" => id)</tt>)
         # * <tt>Firm#clients.create</tt> (similar to <tt>c = Client.new("firm_id" => id); c.save; c</tt>)
         # * <tt>Firm#clients.create!</tt> (similar to <tt>c = Client.new("firm_id" => id); c.save!</tt>)
+        # * <tt>Firm#clients.reload</tt>
         # The declaration can also include an +options+ hash to specialize the behavior of the association.
         #
         # === Scopes
@@ -1392,7 +1369,7 @@ module ActiveRecord
         #   has_many :tags, as: :taggable
         #   has_many :reports, -> { readonly }
         #   has_many :subscribers, through: :subscriptions, source: :user
-        def has_many(name, scope = nil, options = {}, &extension)
+        def has_many(name, scope = nil, **options, &extension)
           reflection = Builder::HasMany.build(self, name, scope, options, &extension)
           Reflection.add_reflection self, name, reflection
         end
@@ -1424,6 +1401,8 @@ module ActiveRecord
         # [create_association!(attributes = {})]
         #   Does the same as <tt>create_association</tt>, but raises ActiveRecord::RecordInvalid
         #   if the record is invalid.
+        # [reload_association]
+        #   Returns the associated object, forcing a database read.
         #
         # === Example
         #
@@ -1433,6 +1412,7 @@ module ActiveRecord
         # * <tt>Account#build_beneficiary</tt> (similar to <tt>Beneficiary.new("account_id" => id)</tt>)
         # * <tt>Account#create_beneficiary</tt> (similar to <tt>b = Beneficiary.new("account_id" => id); b.save; b</tt>)
         # * <tt>Account#create_beneficiary!</tt> (similar to <tt>b = Beneficiary.new("account_id" => id); b.save!; b</tt>)
+        # * <tt>Account#reload_beneficiary</tt>
         #
         # === Scopes
         #
@@ -1523,7 +1503,7 @@ module ActiveRecord
         #   has_one :club, through: :membership
         #   has_one :primary_address, -> { where(primary: true) }, through: :addressables, source: :addressable
         #   has_one :credit_card, required: true
-        def has_one(name, scope = nil, options = {})
+        def has_one(name, scope = nil, **options)
           reflection = Builder::HasOne.build(self, name, scope, options)
           Reflection.add_reflection self, name, reflection
         end
@@ -1553,6 +1533,8 @@ module ActiveRecord
         # [create_association!(attributes = {})]
         #   Does the same as <tt>create_association</tt>, but raises ActiveRecord::RecordInvalid
         #   if the record is invalid.
+        # [reload_association]
+        #   Returns the associated object, forcing a database read.
         #
         # === Example
         #
@@ -1562,6 +1544,7 @@ module ActiveRecord
         # * <tt>Post#build_author</tt> (similar to <tt>post.author = Author.new</tt>)
         # * <tt>Post#create_author</tt> (similar to <tt>post.author = Author.new; post.author.save; post.author</tt>)
         # * <tt>Post#create_author!</tt> (similar to <tt>post.author = Author.new; post.author.save!; post.author</tt>)
+        # * <tt>Post#reload_author</tt>
         # The declaration can also include an +options+ hash to specialize the behavior of the association.
         #
         # === Scopes
@@ -1664,7 +1647,7 @@ module ActiveRecord
         #   belongs_to :company, touch: :employees_last_updated_at
         #   belongs_to :user, optional: true
         #   belongs_to :account, default: -> { company.account }
-        def belongs_to(name, scope = nil, options = {})
+        def belongs_to(name, scope = nil, **options)
           reflection = Builder::BelongsTo.build(self, name, scope, options)
           Reflection.add_reflection self, name, reflection
         end
@@ -1702,8 +1685,8 @@ module ActiveRecord
         # <tt>has_and_belongs_to_many :categories</tt> would add among others <tt>categories.empty?</tt>.
         #
         # [collection]
-        #   Returns an array of all the associated objects.
-        #   An empty array is returned if none are found.
+        #   Returns a Relation of all the associated objects.
+        #   An empty Relation is returned if none are found.
         # [collection<<(object, ...)]
         #   Adds one or more objects to the collection by creating associations in the join table
         #   (<tt>collection.push</tt> and <tt>collection.concat</tt> are aliases to this method).
@@ -1741,6 +1724,9 @@ module ActiveRecord
         #   Returns a new object of the collection type that has been instantiated
         #   with +attributes+, linked to this object through the join table, and that has already been
         #   saved (if it passed the validation).
+        # [collection.reload]
+        #   Returns a Relation of all of the associated objects, forcing a database read.
+        #   An empty Relation is returned if none are found.
         #
         # === Example
         #
@@ -1759,6 +1745,7 @@ module ActiveRecord
         # * <tt>Developer#projects.exists?(...)</tt>
         # * <tt>Developer#projects.build</tt> (similar to <tt>Project.new("developer_id" => id)</tt>)
         # * <tt>Developer#projects.create</tt> (similar to <tt>c = Project.new("developer_id" => id); c.save; c</tt>)
+        # * <tt>Developer#projects.reload</tt>
         # The declaration may include an +options+ hash to specialize the behavior of the association.
         #
         # === Scopes
@@ -1830,7 +1817,7 @@ module ActiveRecord
 
           builder = Builder::HasAndBelongsToMany.new name, self, options
 
-          join_model = ActiveSupport::Deprecation.silence { builder.through_model }
+          join_model = builder.through_model
 
           const_set join_model.name, join_model
           private_constant join_model.name
@@ -1859,7 +1846,7 @@ module ActiveRecord
             hm_options[k] = options[k] if options.key? k
           end
 
-          ActiveSupport::Deprecation.silence { has_many name, scope, hm_options, &extension }
+          has_many name, scope, hm_options, &extension
           _reflections[name.to_s].parent_reflection = habtm_reflection
         end
       end

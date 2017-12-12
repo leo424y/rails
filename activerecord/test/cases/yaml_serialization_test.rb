@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "cases/helper"
 require "models/topic"
 require "models/reply"
@@ -117,6 +119,14 @@ class YamlSerializationTest < ActiveRecord::TestCase
     assert_equal "Sean", dumped.name
     assert_equal author.name_was, dumped.name_was
     assert_equal author.changes, dumped.changes
+  end
+
+  def test_yaml_encoding_keeps_false_values
+    topic = Topic.first
+    topic.approved = false
+    dumped = YAML.load(YAML.dump(topic))
+
+    assert_equal false, dumped.approved
   end
 
   private

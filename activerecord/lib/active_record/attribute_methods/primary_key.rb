@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "set"
 
 module ActiveRecord
@@ -15,13 +17,15 @@ module ActiveRecord
       # Returns the primary key value.
       def id
         sync_with_transaction_state
-        _read_attribute(self.class.primary_key) if self.class.primary_key
+        primary_key = self.class.primary_key
+        _read_attribute(primary_key) if primary_key
       end
 
       # Sets the primary key value.
       def id=(value)
         sync_with_transaction_state
-        write_attribute(self.class.primary_key, value) if self.class.primary_key
+        primary_key = self.class.primary_key
+        _write_attribute(primary_key, value) if primary_key
       end
 
       # Queries the primary key value.

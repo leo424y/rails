@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails/generators/app_base"
 
 module Rails
@@ -49,6 +51,10 @@ module Rails
       copy_file "README.md", "README.md"
     end
 
+    def ruby_version
+      template "ruby-version", ".ruby-version"
+    end
+
     def gemfile
       template "Gemfile"
     end
@@ -63,7 +69,7 @@ module Rails
 
     def version_control
       if !options[:skip_git] && !options[:pretend]
-        run "git init"
+        run "git init", capture: options[:quiet]
       end
     end
 
@@ -105,10 +111,10 @@ module Rails
         template "routes.rb"
         template "application.rb"
         template "environment.rb"
-        template "secrets.yml"
         template "cable.yml" unless options[:skip_action_cable]
         template "puma.rb"   unless options[:skip_puma]
         template "spring.rb" if spring_install?
+        template "storage.yml" unless skip_active_storage?
 
         directory "environments"
         directory "initializers"
@@ -118,9 +124,11 @@ module Rails
 
     def config_when_updating
       cookie_serializer_config_exist = File.exist?("config/initializers/cookies_serializer.rb")
-      action_cable_config_exist = File.exist?("config/cable.yml")
-      rack_cors_config_exist = File.exist?("config/initializers/cors.rb")
-      assets_config_exist = File.exist?("config/initializers/assets.rb")
+      action_cable_config_exist      = File.exist?("config/cable.yml")
+      active_storage_config_exist    = File.exist?("config/storage.yml")
+      rack_cors_config_exist         = File.exist?("config/initializers/cors.rb")
+      assets_config_exist            = File.exist?("config/initializers/assets.rb")
+      csp_config_exist               = File.exist?("config/initializers/content_security_policy.rb")
 
       config
 
@@ -128,8 +136,12 @@ module Rails
         gsub_file "config/initializers/cookies_serializer.rb", /json(?!,)/, "marshal"
       end
 
-      unless action_cable_config_exist
+      if !options[:skip_action_cable] && !action_cable_config_exist
         template "config/cable.yml"
+      end
+
+      if !skip_active_storage? && !active_storage_config_exist
+        template "config/storage.yml"
       end
 
       unless rack_cors_config_exist
@@ -144,7 +156,27 @@ module Rails
         unless assets_config_exist
           remove_file "config/initializers/assets.rb"
         end
+
+        unless csp_config_exist
+          remove_file "config/initializers/content_security_policy.rb"
+        end
       end
+    end
+
+    def master_key
+      return if options[:pretend] || options[:dummy_app]
+
+      require "rails/generators/rails/master_key/master_key_generator"
+      master_key_generator = Rails::Generators::MasterKeyGenerator.new([], quiet: options[:quiet])
+      master_key_generator.add_master_key_file_silently
+      master_key_generator.ignore_master_key_file_silently
+    end
+
+    def credentials
+      return if options[:pretend] || options[:dummy_app]
+
+      require "rails/generators/rails/credentials/credentials_generator"
+      Rails::Generators::CredentialsGenerator.new([], quiet: options[:quiet]).add_credentials_file_silently
     end
 
     def database_yml
@@ -167,6 +199,11 @@ module Rails
 
     def public_directory
       directory "public", "public", recursive: false
+    end
+
+    def storage
+      empty_directory_with_keep_file "storage"
+      empty_directory_with_keep_file "tmp/storage"
     end
 
     def test
@@ -242,6 +279,7 @@ module Rails
       def create_root_files
         build(:readme)
         build(:rakefile)
+        build(:ruby_version)
         build(:configru)
         build(:gitignore)   unless options[:skip_git]
         build(:gemfile)     unless options[:skip_gemfile]
@@ -270,6 +308,14 @@ module Rails
         build(:config_when_updating)
       end
       remove_task :update_config_files
+
+      def create_master_key
+        build(:master_key)
+      end
+
+      def create_credentials
+        build(:credentials)
+      end
 
       def display_upgrade_guide_info
         say "\nAfter this, check Rails upgrade guide at http://guides.rubyonrails.org/upgrading_ruby_on_rails.html for more details about upgrading your app."
@@ -302,6 +348,14 @@ module Rails
         build(:public_directory)
       end
 
+      def create_tmp_files
+        build(:tmp)
+      end
+
+      def create_vendor_files
+        build(:vendor)
+      end
+
       def create_test_files
         build(:test) unless options[:skip_test]
       end
@@ -310,12 +364,8 @@ module Rails
         build(:system_test) if depends_on_system_test?
       end
 
-      def create_tmp_files
-        build(:tmp)
-      end
-
-      def create_vendor_files
-        build(:vendor)
+      def create_storage_files
+        build(:storage) unless skip_active_storage?
       end
 
       def delete_app_assets_if_api_option
@@ -379,7 +429,6 @@ module Rails
 
       def delete_action_cable_files_skipping_action_cable
         if options[:skip_action_cable]
-          remove_file "config/cable.yml"
           remove_file "app/assets/javascripts/cable.js"
           remove_dir "app/channels"
         end
@@ -388,6 +437,7 @@ module Rails
       def delete_non_api_initializers_if_api_option
         if options[:api]
           remove_file "config/initializers/cookies_serializer.rb"
+          remove_file "config/initializers/content_security_policy.rb"
         end
       end
 
@@ -413,6 +463,7 @@ module Rails
 
       public_task :apply_rails_template, :run_bundle
       public_task :run_webpack, :generate_spring_binstubs
+      public_task :run_active_storage
 
       def run_after_bundle_callbacks
         @after_bundle_callbacks.each(&:call)
@@ -463,10 +514,6 @@ module Rails
         elsif Object.const_defined?(app_const_base)
           raise Error, "Invalid application name #{app_name}, constant #{app_const_base} is already in use. Please choose another application name."
         end
-      end
-
-      def app_secret
-        SecureRandom.hex(64)
       end
 
       def mysql_socket
